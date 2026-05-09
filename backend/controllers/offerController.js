@@ -105,16 +105,22 @@ exports.getSellerActiveOffers = async (req, res) => {
   const query = {
     isApproved: true,
     isActive: true,
-    $or: [
-      { startDate: null, endDate: null },
-      { startDate: { $lte: now }, endDate: { $gte: now } },
-      { startDate: { $lte: now }, endDate: null },
-      { startDate: null, endDate: { $gte: now } },
-    ],
+    $and: [
+      {
+        $or: [
+          { startDate: null, endDate: null },
+          { startDate: { $lte: now }, endDate: { $gte: now } },
+          { startDate: { $lte: now }, endDate: null },
+          { startDate: null, endDate: { $gte: now } },
+        ]
+      }
+    ]
   };
 
   if (sellerId && sellerId !== 'all') {
-    query.$or = [{ seller: sellerId }, { createdBy: 'admin' }];
+    query.$and.push({
+      $or: [{ seller: sellerId }, { createdBy: 'admin' }]
+    });
   }
 
   const offers = await Offer.find(query)
