@@ -47,7 +47,7 @@ const orderSchema = new mongoose.Schema({
     country: { type: String, default: 'India' },
     phone: String,
   },
-  paymentMethod: { type: String, default: 'COD' }, // 'COD' | 'QR'
+  paymentMethod: { type: String, default: 'COD' }, // 'COD' | 'QR' | 'Razorpay'
   paymentStatus: { type: String, enum: ['pending', 'awaiting_verification', 'paid', 'refunded'], default: 'pending' },
   totalAmount: { type: Number, required: true }, // net amount buyer pays
   totalCommission: { type: Number, default: 0 },

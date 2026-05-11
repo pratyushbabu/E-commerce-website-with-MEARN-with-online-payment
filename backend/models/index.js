@@ -45,7 +45,7 @@ const paymentSchema = new mongoose.Schema({
   order: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
   buyer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   amount: { type: Number, required: true },
-  method: { type: String, default: 'COD' }, // 'COD' | 'QR'
+  method: { type: String, default: 'COD' }, // 'COD' | 'QR' | 'Razorpay'
   status: { type: String, enum: ['pending', 'awaiting_verification', 'completed', 'refunded', 'failed', 'cancelled'], default: 'pending' },
   transactionId: { type: String, default: '' },
   refundReason: { type: String, default: '' },

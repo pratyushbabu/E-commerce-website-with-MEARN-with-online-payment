@@ -228,8 +228,12 @@ export default function OrderDetail() {
             </p>
             {order.paymentMethod && (
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                Payment: {order.paymentMethod === 'QR' ? '📱 QR/UPI' : '💵 Cash on Delivery'}
-                {isQR && payment && (
+                Payment: {
+                  order.paymentMethod === 'QR' ? '📱 QR/UPI' : 
+                  order.paymentMethod === 'Razorpay' ? '💳 Razorpay' : 
+                  '💵 Cash on Delivery'
+                }
+                {(isQR || order.paymentMethod === 'Razorpay') && payment && (
                   <span style={{ marginLeft: 8 }} className={`badge ${
                     payment.status === 'completed' ? 'badge-success' :
                     payment.status === 'awaiting_verification' ? 'badge-warning' :
@@ -337,7 +341,11 @@ export default function OrderDetail() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Method</span>
-              <span>{order.paymentMethod === 'QR' ? '📱 QR/UPI' : '💵 COD'}</span>
+              <span>{
+                order.paymentMethod === 'QR' ? '📱 QR/UPI' : 
+                order.paymentMethod === 'Razorpay' ? '💳 Razorpay' : 
+                '💵 COD'
+              }</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Status</span>

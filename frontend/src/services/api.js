@@ -106,6 +106,8 @@ export const getBuyerDashboard = () => API.get('/auth/dashboard');
 
 // Payments
 export const getMyPayments = () => API.get('/payments/my');
+export const createRazorpayOrder = (data) => API.post('/payments/razorpay/order', data);
+export const verifyRazorpayPayment = (data) => API.post('/payments/razorpay/verify', data);
 
 export default API;
 

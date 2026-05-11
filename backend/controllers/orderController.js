@@ -29,7 +29,7 @@ exports.placeOrder = async (req, res) => {
   const cart = await Cart.findOne({ user: req.user._id }).populate('items.product');
   if (!cart || cart.items.length === 0) return res.status(400).json({ message: 'Cart is empty' });
 
-  if (!['COD', 'QR'].includes(paymentMethod)) {
+  if (!['COD', 'QR', 'Razorpay'].includes(paymentMethod)) {
     return res.status(400).json({ message: 'Invalid payment method' });
   }
 
@@ -293,7 +293,7 @@ exports.placeOrder = async (req, res) => {
 
   const io = req.app.get('io');
   for (const sub of subOrders) {
-    if (paymentMethod !== 'QR') {
+    if (paymentMethod !== 'QR' && paymentMethod !== 'Razorpay') {
       io.to(`user-${sub.seller}`).emit('new-order', { orderId: order._id, buyerName: req.user.name });
       await Notification.create({
         user: sub.seller,
@@ -425,7 +425,7 @@ exports.cancelOrder = async (req, res) => {
   // Handle payment/refund
   const payment = await Payment.findOne({ order: order._id });
   if (payment) {
-    if (payment.method === 'QR' && payment.status === 'completed') {
+    if ((payment.method === 'QR' || payment.method === 'Razorpay') && payment.status === 'completed') {
       payment.status = 'refunded';
       payment.refundReason = order.cancelReason;
       await payment.save();
@@ -617,7 +617,8 @@ exports.getSellerOrders = async (req, res) => {
     'subOrders.seller': req.user._id,
     $or: [
       { paymentMethod: 'COD' },
-      { paymentMethod: 'QR', paymentStatus: { $nin: ['pending', 'awaiting_verification'] } }
+      { paymentMethod: 'QR', paymentStatus: { $nin: ['pending', 'awaiting_verification'] } },
+      { paymentMethod: 'Razorpay', paymentStatus: 'paid' }
     ]
   })
     .sort({ createdAt: -1 })

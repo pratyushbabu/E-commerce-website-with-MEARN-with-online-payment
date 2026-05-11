@@ -2,9 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
-import { placeOrder, getPublicQRConfig, computeCartOffers } from '../../services/api';
+import { placeOrder, getPublicQRConfig, computeCartOffers, createRazorpayOrder, verifyRazorpayPayment } from '../../services/api';
 import toast from 'react-hot-toast';
-import { FiMapPin, FiTruck, FiShield, FiInfo } from 'react-icons/fi';
+import { FiMapPin, FiTruck, FiShield, FiInfo, FiCreditCard } from 'react-icons/fi';
+
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 const getEffectivePrice = (item) => {
   if (item.effectivePrice != null && item.effectivePrice > 0) return item.effectivePrice;
@@ -59,9 +69,96 @@ export default function Checkout() {
     }).catch(() => {});
   }, [cart]);
 
+  const handleRazorpay = async () => {
+    const resScript = await loadRazorpayScript();
+    if (!resScript) {
+      toast.error('Razorpay SDK failed to load. Are you online?');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Place order first to get internal order ID and final amount
+      const appliedOfferIds = appliedOffers.map(ao => ao.offer?._id || ao.offer);
+      const res = await placeOrder({ 
+        shippingAddress: form, 
+        note: form.note, 
+        paymentMethod: 'Razorpay',
+        appliedOfferIds 
+      });
+      
+      const internalOrder = res.data.order;
+      const internalOrderId = internalOrder._id;
+      const amountToPay = internalOrder.totalAmount;
+
+      // 2. Create Razorpay Order
+      const orderRes = await createRazorpayOrder({ amount: amountToPay });
+      const { order: razorpayOrder } = orderRes.data;
+
+      const options = {
+        key: 'rzp_test_So7Yc02wXbdKOi', // Test Key ID
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+        name: 'MERN Ecommerce',
+        description: `Payment for Order #${internalOrderId.slice(-6).toUpperCase()}`,
+        order_id: razorpayOrder.id,
+        handler: async (response) => {
+          setLoading(true);
+          try {
+            await verifyRazorpayPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              orderId: internalOrderId
+            });
+
+            toast.success('Order placed and paid successfully!');
+            await fetchCart();
+            navigate(`/orders/${internalOrderId}`);
+          } catch (err) {
+            toast.error(err.response?.data?.message || 'Payment verification failed. Please contact support.');
+            navigate(`/orders/${internalOrderId}`); // Go to order page anyway, user can pay later if we add that feature, or see it's pending.
+          } finally {
+            setLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: function() {
+            setLoading(false);
+            toast.error('Payment cancelled');
+            navigate(`/orders/${internalOrderId}`); // Order is created but unpaid.
+          }
+        },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+          contact: form.phone
+        },
+        theme: {
+          color: '#6366f1'
+        }
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to initiate checkout');
+    } finally {
+      // Don't set loading false here if we opened the modal, 
+      // the handler or ondismiss will handle it.
+      // But if we failed before opening modal, we need it.
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (items.length === 0) { toast.error('Cart is empty'); return; }
+    
+    if (paymentMethod === 'Razorpay') {
+      await handleRazorpay();
+      return;
+    }
+
     setLoading(true);
     try {
       const appliedOfferIds = appliedOffers.map(ao => ao.offer?._id || ao.offer);
@@ -148,6 +245,15 @@ export default function Checkout() {
                 <div>
                   <p style={{ fontWeight: 600, fontSize: '15px' }}>💵 Cash on Delivery</p>
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Pay when your order arrives at your door</p>
+                </div>
+              </label>
+
+              {/* Razorpay Option */}
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px 16px', border: `2px solid ${paymentMethod === 'Razorpay' ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 10, cursor: 'pointer', background: paymentMethod === 'Razorpay' ? 'var(--primary-light)' : 'transparent' }}>
+                <input type="radio" name="payment" value="Razorpay" checked={paymentMethod === 'Razorpay'} onChange={() => setPaymentMethod('Razorpay')} style={{ marginTop: 3, accentColor: 'var(--primary)' }} />
+                <div>
+                  <p style={{ fontWeight: 600, fontSize: '15px' }}><FiCreditCard style={{ marginRight: 8, verticalAlign: 'middle' }} /> Online Payment (Razorpay)</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Pay securely using Cards, UPI, Netbanking, or Wallets</p>
                 </div>
               </label>
 
